@@ -5,9 +5,10 @@ frequency = 2500  # Set Frequency To 2500 Hertz
 duration = 1000  # Set Duration To 1000 ms == 1 second
 
 
-def stoparca():
+def stoparca( stSerij=1):
                 sec = int(input("koliko sec?"))
                 st =0
+                print("Število serije  :  "+str(stSerij))
                 while st < sec:
                                 if sec-st <6:
                                                 print("Pozor, pripravi se. Še :  "+str(sec-st)+" sekund")
@@ -18,11 +19,10 @@ def stoparca():
                                 time.sleep(1)
                                 st+=1
                 winsound.Beep(1000, duration)
-                ponovno = input("Še enkrat? ")
-                if ponovno !="n" :
-                                  stoparca()      
+                print("Na vrsti je serija : " + str(stSerij+1))
+                stoparca(stSerij+1)      
                                         
-stoparca()	
+#stoparca()	
 
 
 def stoparca2():
@@ -53,9 +53,9 @@ def stoparca3(sec):
                                                 print("            "+str(sec-st))
                                 time.sleep(1)
                                 st+=1
-for serija in range(10):
+for serija in range(5):
                 print("Serija : "+str(serija))
-                sez= [20,10,20,10,60]
+                sez= [20,20,20,20,20,20,120]
                 for el in sez:
                                 stoparca3(el)
 #stoparca3(3)
