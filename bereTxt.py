@@ -4,6 +4,7 @@ import time
 import sys
 imeFile='farm.txt'
 st=0
+
 class Farma:
                 def __init__(self,x,y):
                                 self.x=x
