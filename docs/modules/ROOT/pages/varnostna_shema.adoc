@@ -1,0 +1,121 @@
+## Varnostna shema
+
+"appusers"  je varnostna shema v *PRODUKCIJI*
+
+V našem SQL Developerju je to baza *vs*.
+
+Pri prijavi kličemo v razvojnem okolju: 
+`vs.javno.podatkiuporabnika(key);
+
+kliče kodo:
+
+
+```sql
+  function PodatkiUporabnika(p_Key in varchar2) return user_cursor
+  is
+    l_emso varchar2(13);
+    return_cursor user_cursor;
+  begin
+
+  l_emso := EMSOuporabnika(p_Key);
+    return return_cursor;
+
+  end PodatkiUporabnika;
+```
+
+____________________________________________________________________
+
+Funkcija : 
+
+```sql
+  l_emso := EMSOuporabnika(p_Key);
+
+####
+
+ FUNCTION EMSOUporabnika(p_Key IN VARCHAR2) RETURN VARCHAR2 IS
+    output VARCHAR2(13);
+    status binary_integer;
+    netid varchar2(13);
+    username varchar2(64);
+    password varchar2(64);
+    permissions sys_refcursor;
+    emso varchar(13);
+  BEGIN
+      
+    emso := vs.vscas.EMSOUporabnika(p_Key);
+    --vs_cas.do_login(p_Key, 'https://mss.si', null, null, status, netid , username , password , permissions );
+    
+    --select u.emso into emso
+    --from vs_mss_test.cs_certificates c
+    --left outer join vs_mss_test.cs_users u on (u.userid = c.userid)
+    --where c.certificateid = netid;
+        
+    RETURN emso;
+  END;
+
+###
+
+__________________________________________________
+
+vs.vscas.EMSOUporabnika(p_Key);
+
+####
+
+FUNCTION EMSOUporabnika(p_Key IN VARCHAR2) RETURN VARCHAR2 IS
+    output VARCHAR2(13);
+    status BINARY_INTEGER;
+    netid VARCHAR2(13);
+    username VARCHAR2(64);
+    password VARCHAR2(64);
+    permissions sys_refcursor;
+    emso varchar(13);
+
+p_log_curr_id number;
+p_log_start_id number;
+  BEGIN
+
+do_log(p_log_value => p_Key, p_log_curr_id => p_log_curr_id, o_log_id => p_log_start_id);
+
+    vs_cas.do_login(p_Key, 'https://mss.si', null, null, status, netid , username , password , permissions );  
+    --vs_cas.do_login(p_Key, c_service, null, null, status, netid, username, password ,permissions);
+
+do_log(p_log_value => netid, p_log_curr_id => p_log_start_id, o_log_id => p_log_curr_id);
+do_log(p_log_value => status, p_log_curr_id => p_log_start_id, o_log_id => p_log_curr_id);
+    
+    BEGIN
+      SELECT u.emso INTO emso
+      FROM cs_certificates c
+      JOIN cs_users u ON (u.userid = c.userid)
+      WHERE c.certificateid = netid;
+    EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+        emso := '';
+      END;
+do_log(p_log_value => emso, p_log_curr_id => p_log_start_id, o_log_id => p_log_curr_id);
+    
+    RETURN emso;
+do_log(p_log_value => 'end', p_log_curr_id => p_log_start_id, o_log_id => p_log_curr_id);
+exception when others then 
+do_log(p_log_value => substr(SQLERRM, 1, 2000), p_log_curr_id => p_log_start_id, o_log_id => p_log_curr_id);
+
+END;
+ 
+________________________________________________________________________
+
+
+
+
+procedure do_log(p_log_value in varchar2 default null, p_log_curr_id in number default null, o_log_id out number)
+is
+pragma autonomous_transaction;
+begin
+  select seq_vscas_log.nextval into o_log_id from dual;
+  insert into vscas_debugg_log(log_id, log_value, log_curr_id) values (o_log_id, p_log_value, p_log_curr_id);
+  commit;
+end;  
+
+```
+
+To so vse funkcije in procedure katere se poženejo ob klicu, ki se pokliče ob prijavi v CEUVIZ ob preverjanju `key` parametra, po prijavi uporabnika v varnostno shema z uporabo certifikata:
+
+"vs.javno.podatkiuporabnika(key);"

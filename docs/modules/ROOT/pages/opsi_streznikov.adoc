@@ -1,0 +1,536 @@
+# DOKUMENTACIJA
+
+## POVRATNI PREHODI
+
+### Prehod 1
+ * Opis vloge
+  * Apache reverse proxy.
+  * Dostopno na : https://eportal.mss.edus.si/
+  * Doseglivo na : 10.1.22.105
+
+ * Shema
+
+![image](uploads/3bbc5e575bcfa2d54440f3015e49a2db/image.png)
+
+ * Operacijski sistem
+   * Windows Server 2008 R2 Enterprise
+ * Programska oprema
+   * Apache 2.4
+   * pot:  D:\Apache2.4
+
+ * Prilagoditev zagona storitve
+   * Zagnan kot windows servis:
+     * ime: Apache2.4
+     * verzija: Apache/2.4.18 (Win64)
+
+ * Opis pomembnih sistemskih procesov, ki so povezani s povratnim prehodom
+
+Liferay projekt se nahaja na .103 in .104 lokacijah. Apache reverse proxy, uporabnika s pomočjo balancer-ja, preusmerja na eno ali drugo lokacijo. V ta namen se doda tudi piškotek "ROUTEID". Preusmerja jih preko "ajp" protokola.
+
+
+
+```xml
+ <Proxy "balancer://liferay" >
+   BalancerMember "ajp://10.1.22.103:9009" route=1 status=-SE connectiontimeout=5 timeout=12 retry=180
+   BalancerMember "ajp://10.1.22.104:9009" route=2 status=-SE connectiontimeout=5 timeout=12 retry=180
+   ProxySet lbmethod=bybusyness failontimeout=on
+</Proxy>
+
+Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+```
+
+Ob prijavi uporabnika na Liferay-u preusmeri nazaj na Apache reverse proxy, ta pa preusmeri povezavo na **VARNOSTNO SHEMO (VS)**
+
+```xml
+<Location /VS62.web>
+ SetHandler weblogic-handler
+ WebLogicCluster 10.1.22.101:8001,10.1.22.102:8001
+</Location>
+
+<Location /VS62.webservices>
+ SetHandler weblogic-handler
+ WebLogicCluster 10.1.22.101:8001,10.1.22.102:8001
+</Location>
+```
+
+ * Virtual server1
+   - ServerName
+     - Kje je objavljen DNS zapis?
+   - Usmerjanje zahtev
+   - Prikaz in opis ključnih konfiguracij
+   - Nadzor
+ * Virtual server2
+   - ServerName
+     - Kje je objavljen DNS zapis?
+   - Usmerjanje
+   - Prikaz in opis ključnih konfiguracij
+   - Nadzor
+
+
+### Prehod 2
+
+
+```
+  <VirtualHost>
+    ServerName abc
+  </VirtualHost>
+
+```
+
+
+## LIFERAY PORTAL
+### Opis
+| Ime | IP | Opis  |
+| ------ | ------ | ------|
+|LIFERAY1 | 10.1.22.103 | node 1|
+|LIFERAY2  | 10.1.22.104 | node 2 |
+| PPMSSTEST | 10.1.22.87 | testni LF portal |
+  * LIFERAY1, LIFERAY2
+  * 10.1.22.103, 10.1.22.
+     * produkcija: http://eportal.mss.edus.si/portal/
+     * test: https://spmsstest.mss.edus.si/portal/
+
+  * Ob kliku na http://eportal.mss.edus.si/portal/ te apache preusmeri na Liferay strežnik.
+  * Na portalu so razvrščene aplikacije, do katerih ima uporabnik pravico dostopat.
+  * Poleg alikacij so na portalu vidna obvestila uporabnikom, pogosta vprašanja, povezave ...
+
+ - Operacijski sistem
+  * Windows Server 2008 R2 Enterprise
+  * Version 6.1 (Build: 7601: Service Pack 1)
+    * CPU: Intel Xeon CPU E5-2620 0 @ 2.00 GHz
+    * RAM : 24  GB
+
+
+- IP naslovi in tcp vhodi
+   * 10.1.22.103, 10.1.22.104
+   * PORTI:
+     * ajp: 9009
+     * http 9080
+     * https: 8443
+
+  * Admin console:
+    * http://localhost:9990/console
+    * user name: OSI
+    * pwd : Klju*******
+
+ >- Povratni prehod
+>   - čez kateri povratni prehod gredo zahteve?
+
+ - JBOSS
+   - Pot namestitve :
+      * D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1
+   - Verzija Jave
+      * "JAVA_HOME=D:\java\jdk7"
+   - Opis zagona
+      * Windows servis: Liferay
+    windows servis je bil ustvarjen s pomočjo nssm.exe. Več o tem: https://shared.osi.si/customer/solstvo/CEUVIZ/wikis/liferay-sreznik-in-restart-skripta
+
+     - opis Java parametrov, ki se uporabijo ob zagonu
+```java
+-Dsun.rmi.dgc.client.gcInterval=3600000 //garbage collector
+-Dsun.rmi.dgc.server.gcInterval=3600000
+-Djava.net.preferIPv4Stack=true"
+-Dorg.jboss.resolver.warning=true"
+-Djboss.modules.system.pkgs=org.jboss.byteman"
+-Djboss.server.default.config=standalone.xml" //konfigurcija
+-Xrunjdwp:transport=dt_socket,address=8787,server=y,suspend=n"
+-Xrunjdwp:transport=dt_shmem,address=jboss,server=y,suspend=n"
+-Djboss.modules.lockless=true"
+  //Lokacija certifikata
+-Djavax.net.ssl.trustStore=D:/portal_config/jboss_keystores/truststore.jks"
+-Djavax.net.ssl.trustStorePassword=test"
+-Dorg.jboss.security.ignoreHttpsHost=true"
+-Djavax.net.debug=ssl,handshake"
+-Djavax.net.ssl.keyStore=D:/portal_config/jboss_keystores/keystore.jks"
+-Djavax.net.ssl.keyStorePassword=test"
+-Dfile.encoding=UTF-8
+-Djava.net.preferIPv4Stack=true
+-Duser.timezone=GMT
+//Memory config
+-Xms4096m -Xmx4096m
+-XX:MaxPermSize=768m
+-XX:+UseParNewGC
+-XX:+UseConcMarkSweepGC
+-XX:+CMSParallelRemarkEnabled
+-XX:SurvivorRatio=20
+-XX:ParallelGCThreads=16"
+```
+
+
+#### Konfiguracijske datoteke
+**D:\liferay-portal-6.2-ce-ga4**
+  * portal-setup-wizard.properties
+  * Lifery konfiguracija: povezava na bazo, lokacija certifikatov, admin informacije, ...
+
+**D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1\bin**
+  * standalone.bat
+     * JAVA_HOME, JBOSS_HOME, JBOSS_OPTS ...
+  * standalone.conf.bat
+      * JAVA_HOME, JAVA_OPTS, ...
+
+**D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1\standalone\configuration**
+  * standalone.xml
+  * JDBC pool, socket-binding, ....
+
+#### Opis konfiguracije JBOSS strežnika
+
+?runners?
+* JDBC pool
+
+   * jdbc:oracle:thin:@oraprod.mszs.sigov.si:1521/platana.mss.edus.si
+   * u_name: mss_portal_prod62
+   * pwd: Ray70Life
+* log datoteke
+   * D:\liferay-portal-6.2-ce-ga4\logs
+   * D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1\standalone\log
+
+
+#### KeyStore:
+   * D:\portal_config\jboss_keystores
+     * truststore.jks
+     * keystore.jks
+
+     - ključni vhodi(tcp porti) in opis vloge
+
+* Pot namestitve
+   * Liferay =>  D:\liferay-portal-6.2-ce-ga4\
+   * JBoss =>  D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1\
+   * Java =>  D:\Java\jdk7\
+
+   - Datoteke keystore s certifikati za client avtentikacijo SSL komunikacije z varnostno shemo
+
+   - Log datoteke
+   - Opis konfiguracijske datoteke
+   - Opis prilagoditve dostopa do podatkovnega skladišča
+```xml
+   <datasource jta="true" jndi-name="java:/jdbc/LiferayPool" pool-name="LiferayPool" enabled="true" use-java-context="true" use-ccm="true">
+    <connection-url>jdbc:oracle:thin:@oraprod.mszs.sigov.si:1521/platana.mss.edus.si</connection-url>
+    <driver>oracle</driver>
+    <security>
+        <user-name>mss_portal_prod62</user-name>
+        <password>Ray70Life</password>
+    </security>
+</datasource>
+```
+
+* Driver za povezavo jBoss-a na bazo:
+ ```xml
+ jdbc.default.driverClassName=oracle.jdbc.driver.OracleDriver
+```
+### Podatkovno skladišče
+
+   1.
+     - ime: platana
+     - username: mss_portal_prod62,
+     - password: Ray70Life
+     - strežnik: oraprod.mszs.sigov.si (10.136.33.159)
+     - port:1521
+     - Service name: platana.mss.edus.si
+
+  2.
+    - ime: Liferay baza
+    - username: mizks_portal
+    - password: *******
+    - Hostname: oraprod.mszs.sigov.si
+    - port:1521
+    - Service name: platana.mss.edus.si
+    - kako dostopam do podatkovnega skladišča: SqlDeveloper
+
+Dostop na bazo je omogočen iz njihovih "mašin" (ljubljanca, liferay1 ...)
+
+### WAR-i
+
+Opis WAR-ov, ki sestavljajo vsebino, ki jo streže Liferay Portal
+
+| WAR| opis |
+| ------ | ------ |
+| MIZS-blue-theme.war | tema |
+| ROOT.war - sistemski ||
+| calendar-portlet.war - ||
+| kaleo-web.war	| sistemski
+| marketplace-portlet.war		| sistemski
+| mizsApplicationFaq-portlet.war | zavihek FAQ
+| mizsApplicationInfo-portlet.war
+| mizsApplicationNavigation-portlet.war
+| mizsApplicationNotifications-portlet.war
+| mizsCalendar-portlet.war | obvestila/dogotki za aplikacije (zavihek koledar)
+| mizsContentDisplay-portlet.war
+| mizsLayout1000-layouttpl.war | tema
+| mizsLayout5050-layouttpl.war | tema
+| mizsLayout7030-layouttpl.war | tema
+| mizsNotificationsFilter-portlet.war | Obvestila
+| mssPodpora-portlet.war	| podpora
+| notifications-portlet.war | sistemski
+| opensocial-portlet.war | sistemski
+| resources-importer-web.war	| sistemski
+| vscas2-ext.war | za prijavo sihronizacija uporabnika
+| vssync-portlet.war |sinhronizacija aplikacij, semafor
+| web-form-portlet.war | sistemski
+| welcome-theme.war | sistemski
+
+Status deploya in vsebino WAR-a je dostopen na:
+ **D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1\standalone\deployments**
+
+ S spremebo končnice lahko upravljaš z warom. V kolikor želiš war odstranit spremeniš kočnico v *.undeploy*, ali obrato v *.dodeploy*
+
+* https://docs.jboss.org/author/display/WFLY8/Application+deployment
+
+Nov war odložiš v mapo: *D:\liferay-portal-6.2-ce-ga4\deploy* in strežnik sam sproži postopek deploy war-a. Premesti war v *D:\liferay-portal-6.2-ce-ga4\jboss-7.1.1\standalone\deployments* mapo in war-u doda končnico z statusom war-a.
+
+
+## VARNOSTNA SHEMA
+ - Opis
+
+
+  | Ime | IP | Opis  |
+  | ------ | ------ | ------|
+  |VS1 | 10.1.22.101 | Varnostna shema node 1|
+  | VS2 | 10.1.22.102 | node 2 |
+  | APMSSTEST | 10.1.22.85 | testna VS |
+
+  * Zmogljivost sistema in operacijski sistem
+     * Windows Server 2008 R2 Enterprise
+     * Version 6.1 (Build: 7601: Service Pack 1)
+       * CPU: Intel Xeon CPU E5-2620 0 @ 2.00 GHz
+       * RAM : 24 GB
+
+* WebLogic server 11g
+* url: http://10.1.22.* :7001/console/
+  * usernam: weblogic
+  * password: aR96#1..
+
+* Java
+  * JDK - 6u45 (x64-bit)
+
+#### WebLogic serverji
+
+  1. vs_domain (admin)
+  2. vs_server1
+  3. vs_server2
+
+| Name | Cluster | Machine | Listen port |
+| ------ | ------ | ------|------|
+| vs_admin(admin)|| | 7001|
+| vs_server1 |	vs_cluster	|vs_machine1| 8001 |
+| vs_server2	| vs_cluster	| vs_machine2	| 8001 |
+
+
+WebLogic NodeManager (vs_domain) je pognan kot windows servis.
+Na * .101 je pognan VS server prek komandnega okna. Pognana je skripta **startWebLogic.cmd**,ki se nahaja "* D:\domains\vs_domain\bin "
+
+##### Config file:
+ * D:\domains\vs_domain\config
+ * **config.xml**
+ * Konfiguracijska datoteka vsebuje naslednje konfiguracije:
+   * vs_domain
+   * vs_admin
+   * vs_server1
+   * vs_server2
+   * vs_machine1
+   * vs_machine1
+   * vs_cluster
+   * java_home
+
+##### Logi:
+
+ * D:\domains\vs_domain\servers\vs_server1\logs
+   * access.log
+   * <server_name>.log
+
+##### Deplojane aplikacije:
+ * VS.web
+ * VS.webservices
+ * VS62.web
+ * VS62.webservices
+
+##### Data sources:
+ * VS
+  * BAZA:
+    * url: oraprod.mszs.sigov.si:1521/platana.mss.edus.si
+    * user: vs
+    * password: neznan
+  * V bazi so uporabniki, ki se prijavljajo na portalu. Uporabniki se prijavljajo z uporabo certifikata.
+ * CASIF:
+   * BAZA
+     * url: 192.168.236.19:1521/multi
+     * user: ca_prod_vs_mizks
+     * password: neznan
+
+#####  Ehcache
+ * D:\domains\vs_domain\servers\vs_server1\VSconfig
+ * Konfiguracija **ehcache62-replicated-xml**
+
+* ```xml
+<cacheManagerPeerProviderFactory class="net.sf.ehcache.distribution.RMICacheManagerPeerProviderFactory"
+   properties="peerDiscovery=manual, rmiUrls=//10.1.22.102:40002/org.jasig.cas.ticket.ServiceTicket|//10.1.22.102:40002/org.jasig.cas.ticket.TicketGrantingTicket" />
+
+ <!--
+ <cacheManagerPeerProviderFactory class="net.sf.ehcache.distribution.RMICacheManagerPeerProviderFactory"
+   properties="peerDiscovery=manual, rmiUrls=" />
+   -->
+
+ <cacheManagerPeerListenerFactory class="net.sf.ehcache.distribution.RMICacheManagerPeerListenerFactory"
+   properties="hostName=10.1.22.101, port=40002, socketTimeoutMillis=120000"
+               propertySeparator="," />
+```
+
+
+#### Opis delovanja
+
+Varnostna shema je namenjena upravljanju uporabnikov portala in vseh ostalih aplikacij, ki so dostopni na portalu. Uporabniki se prijavijo z certifikatom. Po prijavi varnostna shema vrne portalu seznam aplikacij, ki jih ima uporabnik na voljo glede na njegovo številko certifikata.
+Ob vstopu uporabnika v izbrano aplikacijo pa varnosthna shema še enkrat preveri uporabnika in poda aplikaciji "ticket" s katero se uporabnik predstavi aplikaciji.
+
+
+
+### Administrativni dostopi za upravljanje pravic varnostne sheme
+ - opis OSI dostopov
+ - opis prilagoditve certifikatov v podatkovnem skladiđču, da se uporabniku dodeli admin pravice
+ * Na 10.1.22.101 je SQL-developer, kjer je shranjena povezava na bazo (VS -produkcija)
+ * V tabeli **cs_users** so shranjeni uporabniki, ki dostopajo na portal.
+ * v tabeli **cs_certificates** so shranjene serijske številke certifikatov povezane z uporabniki. En uporabnik ima lahko več certifikatov, to pomeni, da lahko z različni certifikati dostopamo na portal z enakim uporabnikom.
+
+ * OSI ima svoj **razvojni** certifikat (razvoj) povezan z uporabnikom Super2 Admin2 (userid=2)
+
+* Sql query za spremebo uporabnika na cetifikatu
+
+
+ ```SQL
+select * from cs_users where userid= 2;
+
+select * from cs_certificates where serialnumber like '3b48b72d%';
+
+update cs_certificates set userid=2 where serialnumber like '3b48b72d%';
+commit;
+
+select * from cs_users where firstname = 'Janez';
+```
+
+
+
+
+
+#### Opis delovanja
+
+Varnostna shema je namenjena upravljanju uporabnikov portala in vseh ostalih aplikacij, ki so dostopni na portalu. Uporabniki se prijavijo z certifikatom. Po prijavi varnostna shema vrne portalu seznam aplikacij, ki jih ima uporabnik na voljo glede na njegovo številko certifikata.
+Ob vstopu uporabnika v izbrano aplikacijo pa varnosthna shema še enkrat preveri uporabnika in poda aplikaciji "ticket" s katero se uporabnik predstavi aplikaciji.
+
+
+
+### Administrativni dostopi za upravljanje pravic varnostne sheme
+ - opis OSI dostopov
+ - opis prilagoditve certifikatov v podatkovnem skladiđču, da se uporabniku dodeli admin pravice
+ * Na 10.1.22.101 je SQL-developer, kjer je shranjena povezava na bazo (VS -produkcija)
+ * V tabeli **cs_users** so shranjeni uporabniki, ki dostopajo na portal.
+ * v tabeli **cs_certificates** so shranjene serijske številke certifikatov povezane z uporabniki. En uporabnik ima lahko več certifikatov, to pomeni, da lahko z različni certifikati dostopamo na portal z enakim uporabnikom.
+
+ * OSI ima svoj **razvojni** certifikat (razvoj) povezan z uporabnikom Super2 Admin2 (userid=2)
+
+* Sql query za spremebo uporabnika na cetifikatu
+
+
+ ```SQL
+select * from cs_users where userid= 2;
+
+select * from cs_certificates where serialnumber like '3b48b72d%';
+
+update cs_certificates set userid=2 where serialnumber like '3b48b72d%';
+commit;
+
+select * from cs_users where firstname = 'Janez';
+```
+
+
+### Opis prijave uporabnika
+
+1. uporabnik pride na portal mss.edus.si http://eportal.mss.edus.si/portal/
+
+2.  Klikne prijava.
+
+![20191030_pregled_projekta-def6a640](uploads/fead3f250a69631717450f6eba520fd5/20191030_pregled_projekta-def6a640.png)
+
+  S tem sproži preusmeritev na http://eportal.mss.edus.si/portal/c/portal/login?p_l_id=20605, ki vrne preusmeritev (HTTP: 302 na URL: https://eportal.mss.edus.si/VS62.web/login?service=http%3A%2F%2Feportal.mss.edus.si%2Fportal%2Fc%2Fportal%2Flogin
+
+
+![20191030_pregled_projekta-d8e14bcc](uploads/e0d6ed5ab629d3cff46958b4d07066f8/20191030_pregled_projekta-d8e14bcc.png)
+
+
+
+če uporabnik nima potrdila se prikaže napaka
+> https://eportal.mss.edus.si/VS62.web/login
+
+če uporabnik ima digitalno potrdilo (SIGEN-CA, SIGOV-CA, POSTAR-CA,...)se potrdilo posreduje varnostni shemi, ki preveri potrdilo v zaledni baži varnostne sheme
+
+  * Seznam veljavnih tipov potrdil je v bazi, tabela *cs_certificates_issuer*
+
+    3.2.1 če potrdilu pripada uporabniku, varnostna shema vrne uporabnika na storitev service s CAS ticket parametrom
+>http://eportal.mss.edus.si/portal/c/portal/login?ticket=ST-44780-WElDPygWTkourTJaFaVH-vs.gov.si
+
+      3.2.2 če potrdilo ne priprada uporabniku v VS zalednih zbirkah, oziroma uporabnik nima nobenih pravic, potem se uporabniku prikaže forma za možen vnos prošnje za dodelitev pravic
+      > https://eportal.mss.edus.si/VS62.web/prosnjaDodelPrav
+
+če se uporabnik vrne na URL iz točke 3) ima veljaven ticket, ki ga posreduje aplikaciji
+aplikacija pokliče VS.VSCAS Oracle stored proceduro in pridobi podatke o uporabniku
+#### Vstop v aplikacijo
+
+Ob vstopu na aplikacijo iz portala, varnostna shema v URL doda key. Aplikacija glede na key dobi uporabnika, ki se prijavlja in njegove pravice na aplikaciji, zavodih ...
+
+5.1 Pokliče VSCAS **EMSOUporabnika** proceduro, ki na veljaven TICKET vrne EMŠO uporabnika.
+5.2 Ta procedura pokliče **vs_cas.do_login**
+> vs_cas.do_login(p_Key, 'https://mss.si', null, null, status, netid , username , password , permissions );
+
+5.3 Ta pa pokliče **YUAPPS_CAS.do_login**
+>YUAPPS_CAS.do_login(
+    sso_ticket,
+    application);
+
+Ta procedura izvede klic na web servis. Z sestavljenim URL-jem(validateurl) poda TICKET, web servis ta mu vrne odgovor o veljavnosti 'vstopnice'
+
+Primer klica:
+
+```
+SERVICE : https://mss.si
+TICKET: ST-268-tcF1veqcbU10dYs9fMeB-vs.gov.si
+URL: http://10.1.22.85:8001/VS.web/servicevalidate?service=https%3a%2f%2fmss.si&ticket=ST-268-tcF1veqcbU10dYs9fMeB-vs.gov.si
+```
+
+Primer uspešnega odgovora:
+```xml
+<cas:serviceResponse>
+  	 <cas:authenticationSuccess>
+      <cas:user>NetID</cas:user>
+      <cas:proxies>
+  		  <cas:proxy>proxy1</cas:proxy>
+  		  <cas:proxy>proxy2</cas:proxy>
+		    <cas:proxy>proxy3</cas:proxy>
+		  ...
+		</cas:proxies>
+     </cas:authenticationSuccess>
+    </cas:serviceResponse>
+```
+
+WebServis vrne **NetID**, ki je ID certifikata uporabnika v tabeli *cs_certificates*.
+
+Vse skupaj se logira v tabelo **yuapps_cas_log**:
+> select * from yuapps_cas_log order by 6 desc;
+
+
+#### Klic webservisa
+
+Za klic web servisa VS.web procedura uporablja metodo **UTL_HTTP.REQUEST**
+
+```sql
+returndata := utl_http.request(validateurl, null,
+            wallet_path, wallet_password);
+```
+
+* validateurl     -> opisan zgoraj
+* wallet_path     -> wallet cartifikatov, privzeta vrednost:     >'file:c:/castest/wallet'
+* wallet_password -> privzeta vrednost: 'test1234'
+
+
+Baza mora v ACL seznamu vsebovati dostope na strežnike, ki jih želimo dosegati z klicem UTL_HTTP.REQUEST.
+V našem primeru je to srežnik: 10.1.22.85:8001 kjer je web servis VS.web
+
+ Opis dodajanja parametrov v ACL listo.
+
+>https://stackoverflow.com/questions/37817384/network-access-denied-by-access-control-list-acl-in-oracle-database-11g
